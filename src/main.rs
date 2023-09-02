@@ -1,3 +1,3 @@
 fn main() {
-    println!("Hello, world!");
+    windows_input_hook::main();
 }
