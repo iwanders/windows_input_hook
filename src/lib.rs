@@ -1,12 +1,14 @@
-
 // use windows_sys;
-use windows::Win32::UI::WindowsAndMessaging::{SetWindowsHookExA, CallNextHookEx, WH_KEYBOARD_LL, GetMessageW, MSG, KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP };
+use windows::Win32::UI::WindowsAndMessaging::{
+    CallNextHookEx, GetMessageW, SetWindowsHookExA, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
+    WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
+};
 // use windows::Win32::System::LibraryLoader::LoadLibraryA;
-use windows::Win32::Foundation::{WPARAM, LPARAM, LRESULT};
+use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 
 /// code: A code the hook procedure uses to determine how to process the message. If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. This parameter can be one of the following values.
 /// Value	Meaning
-/// HC_ACTION 0	
+/// HC_ACTION 0
 /// The wParam and lParam parameters contain information about a keyboard message.
 /// wparam: The identifier of the keyboard message. This parameter can be one of the following messages: WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, or WM_SYSKEYUP.
 /// lparam: Type: LPARAM
@@ -17,27 +19,31 @@ unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRES
         return CallNextHookEx(0, code, wparam, lparam);
     }
 
-    let z = std::mem::transmute::<_, *const KBDLLHOOKSTRUCT >(lparam);
+    let z = std::mem::transmute::<_, *const KBDLLHOOKSTRUCT>(lparam);
     println!("z.vkCode: {}", (*z).vkCode);
     println!("z.scanCode: {}", (*z).scanCode);
     println!("z.flags: 0x{:x?}", (*z).flags);
     println!("time: {:?}", (*z).time);
 
     match wparam as u32 {
-        WM_KEYDOWN => {println!("down");},
-        WM_KEYUP =>  {println!("up");},
-        WM_SYSKEYDOWN => {println!("sys down");},
-        WM_SYSKEYUP => {println!("sys up");},
+        WM_KEYDOWN => {
+            println!("down");
+        }
+        WM_KEYUP => {
+            println!("up");
+        }
+        WM_SYSKEYDOWN => {
+            println!("sys down");
+        }
+        WM_SYSKEYUP => {
+            println!("sys up");
+        }
         _ => {}
     }
     return CallNextHookEx(0, code, wparam, lparam);
 }
-/*
-fffffffffffffffffzzzzzzfsdffffsszzaaa
-*/
 
 pub fn main() {
-
     unsafe {
         // let h = LoadLibraryA("user32.dll");
         // let h = LoadLibraryA("kernel32.dll");
@@ -53,4 +59,3 @@ pub fn main() {
         GetMessageW(&mut message, 0, 0, 0);
     }
 }
-    
