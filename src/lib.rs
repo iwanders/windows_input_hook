@@ -1,7 +1,7 @@
 
 // use windows_sys;
-use windows::Win32::UI::WindowsAndMessaging::{SetWindowsHookExA, CallNextHookEx, WH_KEYBOARD_LL, HOOKPROC, GetMessageW, MSG, KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP };
-use windows::Win32::System::LibraryLoader::LoadLibraryA;
+use windows::Win32::UI::WindowsAndMessaging::{SetWindowsHookExA, CallNextHookEx, WH_KEYBOARD_LL, GetMessageW, MSG, KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP };
+// use windows::Win32::System::LibraryLoader::LoadLibraryA;
 use windows::Win32::Foundation::{WPARAM, LPARAM, LRESULT};
 
 /// code: A code the hook procedure uses to determine how to process the message. If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. This parameter can be one of the following values.
@@ -31,32 +31,26 @@ unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRES
         _ => {}
     }
     return CallNextHookEx(0, code, wparam, lparam);
-    0
 }
 /*
-
+fffffffffffffffffzzzzzzfsdffffsszzaaa
 */
 
 pub fn main() {
 
     unsafe {
         // let h = LoadLibraryA("user32.dll");
-        let h = LoadLibraryA("kernel32.dll");
-        println!("h: 0x{h:x?}");
+        // let h = LoadLibraryA("kernel32.dll");
+        // println!("h: 0x{h:x?}");
         println!("WH_KEYBOARD_LL: 0x{WH_KEYBOARD_LL:x?}");
 
-        let hh = SetWindowsHookExA(WH_KEYBOARD_LL, Some(foo), h, 0);
+        let hh = SetWindowsHookExA(WH_KEYBOARD_LL, Some(foo), 0, 0);
         println!("hh: 0x{hh:x?}");
 
-        loop {
-            println!("looping");
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            // https://stackoverflow.com/a/65571485
-            // This hook is called in the context of the thread that installed it. The call is made by sending a message to the thread that installed the hook. Therefore, the thread that installed the hook must have a message loop.
-            let mut message: MSG = std::mem::zeroed();
-            GetMessageW(&mut message, 0, 0, 0);
-        }
+        // https://stackoverflow.com/a/65571485
+        // This hook is called in the context of the thread that installed it. The call is made by sending a message to the thread that installed the hook. Therefore, the thread that installed the hook must have a message loop.
+        let mut message: MSG = std::mem::zeroed();
+        GetMessageW(&mut message, 0, 0, 0);
     }
-    println!("");
 }
     
