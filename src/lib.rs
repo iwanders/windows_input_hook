@@ -9,6 +9,8 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyNameTextA, MapVirtualKeyA, MAPVK_VK_TO_VSC_EX,
 };
 
+pub mod virtual_keys;
+
 /// code: A code the hook procedure uses to determine how to process the message. If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. This parameter can be one of the following values.
 /// Value	Meaning
 /// HC_ACTION 0
@@ -20,14 +22,15 @@ unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRES
     if code < 0 {
         return CallNextHookEx(HHOOK(0), code, wparam, lparam);
     }
+    println!("");
 
     // let current_id = GetCurrentThreadId();
     // println!("current id; {current_id}");
     let z = std::mem::transmute::<_, *const KBDLLHOOKSTRUCT>(lparam);
-    // println!("z.vkCode: {}", (*z).vkCode);
-    // println!("z.scanCode: {}", (*z).scanCode);
-    // println!("z.flags: 0x{:x?}", (*z).flags);
-    // println!("time: {:?}", (*z).time);
+    println!("z.vkCode: 0x{:x}", (*z).vkCode);
+    println!("z.scanCode: 0x{:x}", (*z).scanCode);
+    println!("z.flags: 0x{:x?}", (*z).flags);
+    println!("time: {:?}", (*z).time);
 
     let action = match wparam.0 as u32 {
         WM_KEYDOWN => KeyAction::Down,
