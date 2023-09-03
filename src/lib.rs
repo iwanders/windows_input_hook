@@ -1,12 +1,13 @@
 // use windows_sys;
 use windows::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, SetWindowsHookExA, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
+    CallNextHookEx, GetMessageW, SetWindowsHookExA, HHOOK, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
     WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
-    HHOOK,
 };
 // use windows::Win32::System::LibraryLoader::LoadLibraryA;
-use windows::Win32::UI::Input::KeyboardAndMouse::GetKeyNameTextA;
-use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM, HINSTANCE, HWND};
+use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetKeyNameTextA, MapVirtualKeyA, MAPVK_VK_TO_VSC_EX,
+};
 
 /// code: A code the hook procedure uses to determine how to process the message. If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. This parameter can be one of the following values.
 /// Value	Meaning
@@ -27,7 +28,7 @@ unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRES
     println!("z.flags: 0x{:x?}", (*z).flags);
     println!("time: {:?}", (*z).time);
 
-    match wparam.0 as u32  {
+    match wparam.0 as u32 {
         WM_KEYDOWN => {
             println!("down");
         }
@@ -45,8 +46,23 @@ unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRES
     return CallNextHookEx(HHOOK(0), code, wparam, lparam);
 }
 
+pub unsafe fn dump_keys() {
+    for i in 0..256 {
+        //
+        let mut v = String::new();
+        for _ in 0..64 {
+            v.insert_str(0, " ");
+        }
+        let scancode = MapVirtualKeyA(i, MAPVK_VK_TO_VSC_EX) as i32;
+        let ret = GetKeyNameTextA(scancode << 16, &mut v.as_mut_vec());
+        let v = &v[..ret as usize];
+        println!("{i} reg: {ret} v: {v:?}");
+    }
+}
+
 pub fn main() {
     unsafe {
+        // dump_keys();
         // let h = LoadLibraryA("user32.dll");
         // let h = LoadLibraryA("kernel32.dll");
         // println!("h: 0x{h:x?}");
@@ -54,10 +70,6 @@ pub fn main() {
 
         let hh = SetWindowsHookExA(WH_KEYBOARD_LL, Some(foo), HINSTANCE(0), 0);
         println!("hh: 0x{hh:x?}");
-
-        let mut v: Vec<u8> = vec![0;64];
-        GetKeyNameTextA(1, &mut v);
-        println!("v: {v:?}");
 
         // https://stackoverflow.com/a/65571485
         // This hook is called in the context of the thread that installed it. The call is made by sending a message to the thread that installed the hook. Therefore, the thread that installed the hook must have a message loop.
