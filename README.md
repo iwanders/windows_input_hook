@@ -1,6 +1,7 @@
 # Windows input hook
 
-Work in progress crate to hook keyboard shortcuts from on Windows using Rust.
+A crate to hook low level keyboard events on Windows. See the `main` function for an example on how
+to use.
 
 
 ## License
