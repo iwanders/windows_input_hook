@@ -1,9 +1,8 @@
-// use windows_sys;
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, PostThreadMessageA, SetWindowsHookExA, UnhookWindowsHookEx, HHOOK,
     KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
-// use windows::Win32::System::LibraryLoader::LoadLibraryA;
+
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -111,7 +110,7 @@ impl InputHook {
     pub fn new(map: HookMap) -> Self {
         let thread_id = std::sync::Arc::new(AtomicU32::new(0));
         let running = std::sync::Arc::new(AtomicBool::new(true));
-        // let mutexed_map = Mutex::new(map);
+
         let tid = thread_id.clone();
         let t_running = running.clone();
         let thread = Some(std::thread::spawn(move || {
@@ -122,9 +121,8 @@ impl InputHook {
                     *l = map;
                 });
 
-                // Store the thread id such that we can later exit this thread.
+                // Store the thread id such that we can later exit this thread by sending a message.
                 let current_id = GetCurrentThreadId();
-                println!("current id; {current_id}");
                 tid.store(current_id, std::sync::atomic::Ordering::Relaxed);
 
                 // Set the hook.
@@ -133,6 +131,8 @@ impl InputHook {
 
                 // https://stackoverflow.com/a/65571485
                 // This hook is called in the context of the thread that installed it. The call is made by sending a message to the thread that installed the hook. Therefore, the thread that installed the hook must have a message loop, which we place here.
+                // I think other systems could send messages, to lets wrap it into a loop with a mutex to quit if we
+                // really want to.
                 while t_running.load(std::sync::atomic::Ordering::Relaxed) {
                     let mut message: MSG = std::mem::zeroed();
                     GetMessageW(&mut message, HWND(0), 0, 0);
@@ -170,8 +170,7 @@ impl Drop for InputHook {
 
 pub fn main() {
     let mut map: HookMap = std::collections::HashMap::new();
-    // let f : Box<HookFunction>  = Box::new(|v: KeyInput|{println!("sdkfjlds: {v:?}");});
-    // map.insert(KeyInput::down(65), f);
+
     map.insert(
         KeyInput::down(65),
         Box::new(|v: KeyInput| {
