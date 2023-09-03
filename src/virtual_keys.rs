@@ -1,7 +1,13 @@
+/// Module to hold the virtual key codes.
+
+/// Struct to represent a single virtual keycode.
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub struct VirtualKey {
+    /// Constant
     pub id: u8,
+    /// Name
     pub name: &'static str,
+    /// Description
     pub description: &'static str,
 }
 
@@ -20,6 +26,7 @@ for k in el:
         print("VirtualKey {id: "+ z + ", name: \"" + name + "\", description: \"" + desc + "\"},")
 
 */
+/// Array containing the virtual key codes from https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 pub static VIRTUAL_KEYS: [VirtualKey; 143] = [
 VirtualKey {id: 0x01, name: "LBUTTON", description: "Left mouse button"},
 VirtualKey {id: 0x02, name: "RBUTTON", description: "Right mouse button"},

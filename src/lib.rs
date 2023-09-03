@@ -5,12 +5,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::System::Threading::GetCurrentThreadId;
-use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetKeyNameTextA, MapVirtualKeyA, MAPVK_VK_TO_VSC_EX,
-};
 
 pub mod virtual_keys;
 
+/// Single global hook handler function, it uses the thread_local in InputHook to dispatch appropriately.
+///
 /// code: A code the hook procedure uses to determine how to process the message. If nCode is less than zero, the hook procedure must pass the message to the CallNextHookEx function without further processing and should return the value returned by CallNextHookEx. This parameter can be one of the following values.
 /// Value	Meaning
 /// HC_ACTION 0
@@ -18,19 +17,19 @@ pub mod virtual_keys;
 /// wparam: The identifier of the keyboard message. This parameter can be one of the following messages: WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, or WM_SYSKEYUP.
 /// lparam: Type: LPARAM
 /// A pointer to a KBDLLHOOKSTRUCT structure.
-unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+unsafe extern "system" fn hook_handler(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     if code < 0 {
         return CallNextHookEx(HHOOK(0), code, wparam, lparam);
     }
-    println!("");
+    // println!("");
 
     // let current_id = GetCurrentThreadId();
     // println!("current id; {current_id}");
     let z = std::mem::transmute::<_, *const KBDLLHOOKSTRUCT>(lparam);
-    println!("z.vkCode: 0x{:x}", (*z).vkCode);
-    println!("z.scanCode: 0x{:x}", (*z).scanCode);
-    println!("z.flags: 0x{:x?}", (*z).flags);
-    println!("time: {:?}", (*z).time);
+    // println!("z.vkCode: 0x{:x}", (*z).vkCode);
+    // println!("z.scanCode: 0x{:x}", (*z).scanCode);
+    // println!("z.flags: 0x{:x?}", (*z).flags);
+    // println!("time: {:?}", (*z).time);
 
     let action = match wparam.0 as u32 {
         WM_KEYDOWN => KeyAction::Down,
@@ -44,62 +43,64 @@ unsafe extern "system" fn foo(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRES
 
     let input = KeyInput {
         action,
-        code: (*z).vkCode as u8,
+        vk_code: (*z).vkCode as u8,
     };
+    let time = EventTime((*z).time);
     InputHook::MAP.with(|z| {
         let mut l = z.borrow_mut();
         if let Some(f) = l.get_mut(&input) {
-            f(input);
+            f(input, time);
         }
     });
 
     return CallNextHookEx(HHOOK(0), code, wparam, lparam);
 }
 
-pub unsafe fn dump_keys() {
-    for i in 0..256 {
-        let mut v = String::new();
-        for _ in 0..64 {
-            v.insert_str(0, " ");
-        }
-        let scancode = MapVirtualKeyA(i, MAPVK_VK_TO_VSC_EX) as i32;
-        let ret = GetKeyNameTextA(scancode << 16, &mut v.as_mut_vec());
-        let v = &v[..ret as usize];
-        println!("{i} reg: {ret} v: {v:?}");
-    }
-}
-
+/// Enum to denote key direction
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub enum KeyAction {
+    /// Key went up
     Up,
+    /// Key went down
     Down,
 }
+
+/// Struct to represent a particular key input.
 #[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
 pub struct KeyInput {
+    /// The action of the key.
     action: KeyAction,
-    code: u8,
+    /// The virtual key code for this input.
+    vk_code: u8,
 }
 impl KeyInput {
-    pub fn down(code: u8) -> Self {
+    /// Create a downward key input.
+    pub fn down(vk_code: u8) -> Self {
         KeyInput {
             action: KeyAction::Down,
-            code,
+            vk_code,
         }
     }
-    pub fn up(code: u8) -> Self {
+    /// Create a upward key input.
+    pub fn up(vk_code: u8) -> Self {
         KeyInput {
             action: KeyAction::Up,
-            code,
+            vk_code,
         }
     }
 }
 
-type HookFunction = dyn FnMut(KeyInput) + Send;
-type HookHandler = Box<HookFunction>;
-type HookMap = std::collections::HashMap<KeyInput, HookHandler>;
+/// Struct to denote the event input time (uptime of the computer in ms?)
+#[derive(Eq, Hash, PartialEq, Debug, Copy, Clone)]
+pub struct EventTime(pub u32);
+
+pub type HookFunction = dyn FnMut(KeyInput, EventTime) + Send;
+pub type HookHandler = Box<HookFunction>;
+pub type HookMap = std::collections::HashMap<KeyInput, HookHandler>;
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, AtomicU32};
+/// Struct to hook inputs.
 pub struct InputHook {
     thread: Option<std::thread::JoinHandle<()>>,
     thread_id: std::sync::Arc<AtomicU32>,
@@ -107,9 +108,12 @@ pub struct InputHook {
 }
 impl InputHook {
     thread_local! {
+        /// Thread local map to store the callbacks used for this hook handler.
         static MAP: RefCell<HookMap> = RefCell::new(Default::default());
     }
 
+    /// Create a new input hook with the provided map of functions. Hooks are destroyed when the object goes out of
+    /// scope.
     pub fn new(map: HookMap) -> Self {
         let thread_id = std::sync::Arc::new(AtomicU32::new(0));
         let running = std::sync::Arc::new(AtomicBool::new(true));
@@ -129,7 +133,7 @@ impl InputHook {
                 tid.store(current_id, std::sync::atomic::Ordering::Relaxed);
 
                 // Set the hook.
-                let hh = SetWindowsHookExA(WH_KEYBOARD_LL, Some(foo), HINSTANCE(0), 0)
+                let hh = SetWindowsHookExA(WH_KEYBOARD_LL, Some(hook_handler), HINSTANCE(0), 0)
                     .expect("hook did not succeed");
 
                 // https://stackoverflow.com/a/65571485
@@ -171,17 +175,18 @@ impl Drop for InputHook {
     }
 }
 
+/// Example main function that shows how to use this.
 pub fn main() {
     let mut map: HookMap = std::collections::HashMap::new();
 
     map.insert(
         KeyInput::down(65),
-        Box::new(|v: KeyInput| {
-            println!("A: {v:?}");
+        Box::new(|v: KeyInput, t| {
+            println!("A: {v:?} at {t:?}");
         }),
     );
     let _h = InputHook::new(map);
-    for _i in 0..50 {
-        std::thread::sleep(std::time::Duration::from_millis(100));
+    for _i in 0..5 {
+        std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 }
